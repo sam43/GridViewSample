@@ -1,0 +1,30 @@
+<RelativeLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/rl"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="10dp"
+    tools:context=".MainActivity"
+    android:background="#c2c6b6"
+    >
+    <Button
+        android:id="@+id/btn"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Remove Second Item"
+        />
+    <GridView
+        android:id="@+id/gv"
+        android:layout_width="675dp"
+        android:layout_height="wrap_content"
+        android:padding="5dp"
+        android:numColumns="3"
+        android:background="#e8eae7"
+        android:verticalSpacing="5dp"
+        android:horizontalSpacing="5dp"
+        android:gravity="left"
+        android:layout_below="@id/btn"
+        >
+    </GridView>
+</RelativeLayout>
