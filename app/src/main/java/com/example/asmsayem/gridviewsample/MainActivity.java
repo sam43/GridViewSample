@@ -1,11 +1,13 @@
 package com.example.asmsayem.gridviewsample;
 
+import android.app.ProgressDialog;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.provider.MediaStore;
+import android.support.annotation.NonNull;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
@@ -18,11 +20,19 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.example.asmsayem.gridviewsample.models.PhotoInfoModel;
+import com.example.asmsayem.gridviewsample.models.ResponsePathsPhoto;
+
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
+
 public class MainActivity extends AppCompatActivity implements View.OnClickListener {
 
+    private static final int MY_PERMISSIONS_REQUEST_CAMERA = 2;
     final private int PICK_IMAGE = 1;
     final private int CAPTURE_IMAGE = 2;
     Button btn_change, btn_delete, btn_upload;
@@ -30,11 +40,18 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     ImageView img_user_photo;
     LinearLayout ll_chng_dlt;
     Bitmap upImageBitmap;
+    ProgressDialog progressDialog;
+    GlobalClasses cls;
+    String userID = "241028", decodeID = "NSu6L6", isCVposted = "True", isResumeUpdate = "false";
+    private String folderName;
+    private String folderId, status;
+    private String imageName, img_base64;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        ExistingPhotoResponse();
         InitializeViews();
         OnCLickListeners();
     }
@@ -47,12 +64,17 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
 
     private void InitializeViews() {
+        cls = new GlobalClasses();
         btn_change = (Button) findViewById(R.id.btn_change);
         btn_delete = (Button) findViewById(R.id.btn_delete);
         btn_upload = (Button) findViewById(R.id.btn_upload);
         tv_upload_info = (TextView) findViewById(R.id.tv_upload_info);
         img_user_photo = (ImageView) findViewById(R.id.img_user_ups);
         ll_chng_dlt = (LinearLayout) findViewById(R.id.ll_chng_dlt);
+        progressDialog = new ProgressDialog(this);
+        progressDialog.setMessage("Please Wait..");
+        progressDialog.setTitle("Saving...");
+        progressDialog.setCancelable(false);
     }
 
     @Override
@@ -60,25 +82,76 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         switch (v.getId()) {
             case R.id.btn_change:
                 ShowChooserAlert();
-                //Toast.makeText(this, "Changed!!!", Toast.LENGTH_SHORT).show();
                 break;
             case R.id.btn_delete:
+                status = "delete";
+                UploadDeletePtoto(status);
                 btn_upload.setVisibility(View.VISIBLE);
                 ll_chng_dlt.setVisibility(View.GONE);
-                Toast.makeText(this, "deleted!!!", Toast.LENGTH_SHORT).show();
                 break;
             case R.id.btn_upload:
-                UploadToServer();
-                String img_base64 = bitmapToString();
+                status = "upload";
+                progressDialog.show();
+                img_base64 = bitmapToString();
                 Log.d("****ImagBase64", "onClick: " + img_base64);
+                UploadDeletePtoto(status);
+                finish();
             default:
-                Toast.makeText(this, "default!!!", Toast.LENGTH_SHORT).show();
                 break;
         }
     }
 
-    private void UploadToServer() {
+    private void UploadDeletePtoto(String status) {
+        MybdjobsAPI.Factory.getInstance()
+                .uploadPhoto(img_base64, userID, decodeID, folderName, folderId, imageName, isResumeUpdate, status)
+                .enqueue(new Callback<ResponsePathsPhoto>() {
+                    @Override
+                    public void onResponse(Call<ResponsePathsPhoto> call, Response<ResponsePathsPhoto> response) {
+                        progressDialog.dismiss();
+                        ResponsePathsPhoto photo = response.body();
+                        if (response.isSuccessful()) {
+                            Log.d("***UploadedPhoto", "onResponse: " + photo.getMessgae());
+                            cls.Tostyfy(MainActivity.this, "" + photo.getMessgae());
+                        } else {
+                            Log.d("***UploadedPhoto", "onResponse: " + photo.getMessgae());
+                            cls.Tostyfy(MainActivity.this, "" + photo.getMessgae());
+                        }
+                    }
 
+                    @Override
+                    public void onFailure(Call<ResponsePathsPhoto> call, Throwable t) {
+                        progressDialog.dismiss();
+                        Log.e("photoAPI", t.getMessage());
+                    }
+                });
+    }
+
+    private void ExistingPhotoResponse() {
+        MybdjobsAPI.Factory.getInstance()
+                .getPhotoInfo(userID, decodeID)
+                .enqueue(new Callback<PhotoInfoModel>() {
+                    @Override
+                    public void onResponse(Call<PhotoInfoModel> call, Response<PhotoInfoModel> response) {
+                        if (response.isSuccessful()) {
+                            if (response.body().getMessageType().equals("1")) {
+
+                                folderName = response.body().getFolderName();
+                                folderId = response.body().getFolderId();
+                                imageName = response.body().getImageName();
+
+                            } else {
+                                cls.Tostyfy(MainActivity.this, "Something wrong!");
+                            }
+                        }
+                    }
+
+                    @Override
+                    public void onFailure(Call<PhotoInfoModel> call, Throwable t) {
+
+                        progressDialog.dismiss();
+                        Log.e("photoAPI", t.getMessage());
+                    }
+                });
     }
 
     private void ShowChooserAlert() {
@@ -97,22 +170,23 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     startActivityForResult(intent, PICK_IMAGE);
                     btn_upload.setVisibility(View.VISIBLE);
                     ll_chng_dlt.setVisibility(View.GONE);
-                    Toast.makeText(MainActivity.this, charSequence[which], Toast.LENGTH_SHORT).show();
+                    cls.Tostyfy(MainActivity.this, "" + charSequence[which]);
                 } else if (charSequence[which] == "Take Photo") {
                     Intent intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
                     if (intent.resolveActivity(getPackageManager()) != null) {
                         startActivityForResult(intent, CAPTURE_IMAGE);
                     }
+                    //RequestPermissionAndOpenCamera();
                     btn_upload.setVisibility(View.VISIBLE);
                     ll_chng_dlt.setVisibility(View.GONE);
 
-                    Toast.makeText(MainActivity.this, charSequence[which], Toast.LENGTH_SHORT).show();
+                    cls.Tostyfy(MainActivity.this, "" + charSequence[which]);
                 } else if (charSequence[which] == "Facebook") {
-                    Toast.makeText(MainActivity.this, charSequence[which], Toast.LENGTH_SHORT).show();
+                    cls.Tostyfy(MainActivity.this, "" + charSequence[which]);
                 } else if (charSequence[which] == "Google +") {
-                    Toast.makeText(MainActivity.this, charSequence[which], Toast.LENGTH_SHORT).show();
+                    cls.Tostyfy(MainActivity.this, "" + charSequence[which]);
                 } else if (charSequence[which] == "LinkedIn") {
-                    Toast.makeText(MainActivity.this, charSequence[which], Toast.LENGTH_SHORT).show();
+                    cls.Tostyfy(MainActivity.this, "" + charSequence[which]);
                 }
             }
         });
@@ -142,10 +216,10 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 upImageBitmap = getResizedBitmap(upImageBitmap, 800);
                 img_user_photo.setImageBitmap(upImageBitmap);
             } else {
-                Toast.makeText(this, "You haven't picked any Image!", Toast.LENGTH_LONG).show();
+                cls.Tostyfy(this, "You haven't picked any Image!");
             }
         } catch (Exception e) {
-            Toast.makeText(this, "Something went wrong!", Toast.LENGTH_LONG).show();
+            cls.Tostyfy(this, "Something went wrong!");
         }
     }
 
